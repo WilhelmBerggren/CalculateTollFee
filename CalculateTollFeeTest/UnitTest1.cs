@@ -11,14 +11,30 @@ namespace CalculateTollFeeTest
          * Bugs:
          * 1. Within hour applies both fees
          * 2. Applies fees after 18.30
-         * 3. Free on Fridays
-         * 4. Not free on Sundays
-         * 5. Fee is ever less than 60
-         * 6. Fee can be over 60
-         * 7. Between 8.30 and 14.59, there is no fee in first 29 minutes of every hour
-         * 8. When more than one hour between times, only minute difference is recognized
-         * 9. Unsorted array gives wrong fee
+         * 3. Free on Fridays 
+         * 4. Not free on Sundays (fixed)
+         * 5. Fee is ever less than 60 (fixed)
+         * 6. Fee can be over 60       (fixed)
+         * 7. Between 8.30 and 14.59, there is no fee in first 29 minutes of every hour (fixed)
+         * 8. When more than one hour between times, only minute difference is recognized (fixed)
+         * 9. Unsorted array gives wrong fee (fixed)
+         * 10. On new day program should either throw exception or split toll fee on two days
          */
+        [TestMethod]
+        public void UnsortedInputTest()
+        {
+            //Program should throw exception if input array is unsorted
+            //Bug: Unsorted array gives wrong fee
+
+            DateTime[] data = {
+                new DateTime(2020, 11, 25, 8, 15, 00),
+                new DateTime(2020, 11, 25, 6, 15, 00),
+                new DateTime(2020, 11, 25, 16, 15, 00),
+                new DateTime(2020, 11, 24, 14, 15, 00)
+            };
+
+            Assert.ThrowsException<FormatException>(() => Program.TotalFeeCost(data));
+        }
 
         [TestMethod]
         public void FirstFeeWithinHourLowerTest()
@@ -30,6 +46,18 @@ namespace CalculateTollFeeTest
             var date2 = new DateTime(2020, 11, 25, 6, 35, 00);
 
             Assert.AreEqual(13, Program.TotalFeeCost(new[] { date1, date2 }));
+        }
+
+        [TestMethod]
+        public void ShouldThrowExceptionOnMultipleDatesTest()
+        {
+            //If the data span over multiple days an exception should be thrown
+            //Bug: it don't, man.
+
+            var date1 = new DateTime(2020, 11, 25, 8, 01, 00);
+            var date2 = new DateTime(2020, 11, 26, 8, 31, 00);
+
+            Assert.ThrowsException<FormatException>(() => Program.TotalFeeCost(new[] { date1, date2 }));
         }
 
         [TestMethod]
@@ -47,16 +75,23 @@ namespace CalculateTollFeeTest
         [TestMethod]
         public void NoFeeAfterSixThirtyTest()
         {
-            // No fee should occur after 6.30
+            // No fee should occur after 18.30
 
-            var date1 = new DateTime(2020, 11, 25, 19, 30, 00);
+            var date1 = new DateTime(2020, 11, 23, 19, 30, 00);
 
-            Assert.AreEqual(0, Program.TotalFeeCost(new[] { date1 }));
+            for (int i = 0; i < 7; i++)
+            {
+                Assert.AreEqual(0, Program.TotalFeeCost(new[] { date1 }));
+                date1 = date1.AddDays(1);
+            }
         }
 
         [TestMethod]
         public void FeeOnWeekdaysTest()
         {
+            //Fees should be applied on weekdays between 6:00 and 18:29
+            //Bug: No fee is added on fridays
+
             var monday = new DateTime(2020, 11, 23, 9, 35, 00);
             var tuesday = new DateTime(2020, 11, 24, 9, 00, 00);
             var wednesday = new DateTime(2020, 11, 25, 9, 00, 00);
@@ -81,11 +116,14 @@ namespace CalculateTollFeeTest
         {
             // There should be no fees on weekends
             // Bug: Fees are added on Sundays
-            var saturday = new DateTime(2020, 11, 28, 9, 00, 00);
-            var sunday = new DateTime(2020, 11, 29, 9, 00, 00);
+            var weekendDate = new DateTime(2020, 11, 28, 0, 00, 00);
 
-            Assert.AreEqual(0, Program.TotalFeeCost(new[] { saturday }));
-            Assert.AreEqual(0, Program.TotalFeeCost(new[] { sunday }));
+            for (int i = 0; i < 96; i++)
+            {
+                Assert.AreEqual(0, Program.TotalFeeCost(new[] { weekendDate }));
+                weekendDate = weekendDate.AddMinutes(30);
+            }
+
         }
 
         [TestMethod]
@@ -125,60 +163,6 @@ namespace CalculateTollFeeTest
             Assert.AreNotEqual(0, Program.TotalFeeCost(new[] { date1 }));
             Assert.AreNotEqual(0, Program.TotalFeeCost(new[] { date2 }));
             Assert.AreNotEqual(0, Program.TotalFeeCost(new[] { date3 }));
-        }
-
-        [TestMethod]
-        public void TollFeePassTest()
-        {
-            var date1 = new DateTime(2020, 11, 29, 6, 15, 00);
-            var date2 = new DateTime(2020, 11, 29, 6, 30, 00);
-            var date3 = new DateTime(2020, 11, 29, 7, 00, 00);
-            var date4 = new DateTime(2020, 11, 29, 8, 00, 00);
-            var date5 = new DateTime(2020, 11, 29, 8, 30, 00);
-            var date6 = new DateTime(2020, 11, 29, 15, 00, 00);
-            var date7 = new DateTime(2020, 11, 29, 15, 30, 00);
-            var date8 = new DateTime(2020, 11, 29, 17, 30, 00);
-            var date9 = new DateTime(2020, 11, 29, 18, 00, 00);
-            var date10 = new DateTime(2020, 11, 29, 18, 30, 00);
-
-            Assert.AreEqual(8, Program.TollFeePass(date1));
-            Assert.AreEqual(13, Program.TollFeePass(date2));
-            Assert.AreEqual(18, Program.TollFeePass(date3));
-            Assert.AreEqual(13, Program.TollFeePass(date4));
-            Assert.AreEqual(8, Program.TollFeePass(date5));
-            Assert.AreEqual(13, Program.TollFeePass(date6));
-            Assert.AreEqual(18, Program.TollFeePass(date7));
-            Assert.AreEqual(13, Program.TollFeePass(date8));
-            Assert.AreEqual(8, Program.TollFeePass(date9));
-            Assert.AreEqual(0, Program.TollFeePass(date10));
-
-            Assert.AreNotEqual(8, Program.TollFeePass(date2));
-        }
-
-        [TestMethod]
-        public void FreeTest()
-        {
-            var monday = new DateTime(2020, 11, 23, 9, 00, 00);
-            var tuesday = new DateTime(2020, 11, 24, 9, 00, 00);
-            var wednesday = new DateTime(2020, 11, 25, 9, 00, 00);
-            var thursday = new DateTime(2020, 11, 26, 9, 00, 00);
-            var friday = new DateTime(2020, 11, 27, 9, 00, 00);
-            var saturday = new DateTime(2020, 11, 28, 9, 00, 00);
-            var sunday = new DateTime(2020, 11, 29, 9, 00, 00);
-
-            var july = new DateTime(2020, 7, 01, 9, 00, 00);
-            var april = new DateTime(2020, 4, 01, 9, 00, 00);
-
-            Assert.IsFalse(Program.free(monday));
-            Assert.IsFalse(Program.free(tuesday));
-            Assert.IsFalse(Program.free(wednesday));
-            Assert.IsFalse(Program.free(thursday));
-            Assert.IsFalse(Program.free(friday));
-            Assert.IsTrue(Program.free(saturday));
-            Assert.IsTrue(Program.free(sunday));
-
-            Assert.IsTrue(Program.free(july));
-            Assert.IsFalse(Program.free(april));
         }
     }
 }

@@ -1,28 +1,18 @@
 ﻿using System;
-using System.Linq;
+using System.IO;
 
 namespace TollFeeCalculator
 {
     public class Program
     {
-        public static void Main()
+        static void Main()
         {
-            var d = new DateTime(2020, 11, 29, 6, 00, 00);
-            for (var i = 0; i <= 2 * 24; i++)
-            {
-                Console.Write(d.ToShortTimeString());
-                Console.Write("\t");
-                Console.Write(TotalFeeCost(new[] { d }));
-                Console.WriteLine();
-                d = d.AddMinutes(30);
-            }
-
             run(Environment.CurrentDirectory + "../../../../testData.txt");
         }
 
         public static void run(String inputFile)
         {
-            string indata = System.IO.File.ReadAllText(inputFile);
+            string indata = File.ReadAllText(inputFile);
             String[] dateStrings = indata.Split(", ");
             DateTime[] dates = new DateTime[dateStrings.Length - 1];
             for (int i = 0; i < dates.Length; i++)
@@ -35,48 +25,58 @@ namespace TollFeeCalculator
         public static int TotalFeeCost(DateTime[] dates)
         {
             int fee = 0;
-
-            Array.Sort(dates);
-
-            DateTime startDate = dates[0]; //Starting interval
-            foreach (var date in dates)
+            DateTime startingInterval = dates[0];
+            foreach (var d2 in dates)
             {
-                double diffInMinutes = (date - startDate).TotalMinutes;
+                double diffInMinutes = (d2 - startingInterval).TotalMinutes;
+                if (diffInMinutes < 0) throw new FormatException("Dates is unsorted");
                 if (diffInMinutes > 60)
                 {
-                    fee += TollFeePass(date);
-                    startDate = date;
+                    fee += TollFeePass(d2);
+                    startingInterval = d2;
                 }
                 else
                 {
-                    fee += Math.Max(TollFeePass(date), TollFeePass(startDate));
+                    fee += Math.Max(TollFeePass(d2), TollFeePass(startingInterval));
                 }
             }
             return Math.Min(fee, 60);
         }
 
-        public static int TollFeePass(DateTime d)
+        static int TollFeePass(DateTime date)
         {
-            if (free(d)) return 0;
-            int hour = d.Hour;
-            int minute = d.Minute;
-            if (hour == 6 && minute >= 0 && minute <= 29) return 8;
-            else if (hour == 6 && minute >= 30 && minute <= 59) return 13;
-            else if (hour == 7 && minute >= 0 && minute <= 59) return 18;
-            else if (hour == 8 && minute >= 0 && minute <= 29) return 13;
-            else if (hour >= 8 && hour <= 14 && minute >= 30 && minute <= 59) return 8;
-            else if (hour == 15 && minute >= 0 && minute <= 29) return 13;
-            else if (hour == 15 && minute >= 0 || hour == 16 && minute <= 59) return 18;
-            else if (hour == 17 && minute >= 0 && minute <= 59) return 13;
-            else if (hour == 18 && minute >= 0 && minute <= 29) return 8;
-            else return 0;
+            if (IsDateFree(date)) return 0;
+            var fees = new[]
+            {
+                ((0, 00), 0),
+                ((6, 00), 8),
+                ((6, 30), 13),
+                ((7, 00), 18),
+                ((8, 00), 13),
+                ((8, 30), 8),
+                ((15, 00), 13),
+                ((15, 30), 18),
+                ((17, 00), 13),
+                ((18, 00), 8),
+                ((18, 30), 0)
+            };
+
+            for (int i = 0; i < fees.Length; i++)
+            {
+                (var hour, var minute) = fees[i].Item1;
+
+                if (date.Hour < hour && date.Minute < minute) return fees[i - 1].Item2;
+            }
+            return 0;
         }
-        //Gets free dates
-        public static bool free(DateTime day)
+
+        static bool IsDateFree(DateTime day)
         {
-            if (day.Hour < 6) return true;
-            if (day.Hour >= 18 && day.Minute >= 30) return true;
-            return (int)day.DayOfWeek == 6 || day.DayOfWeek == 0 || day.Month == 7;
+            return (
+                day.DayOfWeek == DayOfWeek.Sunday || 
+                day.DayOfWeek == DayOfWeek.Saturday || 
+                day.Month == 7
+            );
         }
     }
 }
