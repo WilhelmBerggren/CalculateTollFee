@@ -24,23 +24,34 @@ namespace TollFeeCalculator
 
         public static int TotalFeeCost(DateTime[] dates)
         {
-            int fee = 0;
             DateTime startingInterval = dates[0];
+            int totalFee = 0;
+            int previousFee = 0;
             foreach (var d2 in dates)
             {
                 double diffInMinutes = (d2 - startingInterval).TotalMinutes;
                 if (diffInMinutes < 0) throw new FormatException("Dates is unsorted");
-                if (diffInMinutes > 60)
+                if (diffInMinutes < 60)
                 {
-                    fee += TollFeePass(d2);
-                    startingInterval = d2;
+                    totalFee += Math.Max(TollFeePass(d2), TollFeePass(startingInterval));
                 }
                 else
                 {
-                    fee += Math.Max(TollFeePass(d2), TollFeePass(startingInterval));
+                    totalFee += TollFeePass(d2);
+                    startingInterval = d2;
                 }
             }
-            return Math.Min(fee, 60);
+
+            for (int i = 0; i < dates.Length; i++)
+            {
+                if(i == 0)
+                if((dates[i] - dates[i-1]).TotalMinutes < 60)
+                {
+                    totalFee += Math.Max(TollFeePass(dates[i]), TollFeePass(dates[i - 1]));
+                    totalFee -= Math.Min(TollFeePass(dates[i]), TollFeePass(dates[i - 1]));
+                }
+            }
+            return Math.Min(totalFee, 60);
         }
 
         static int TollFeePass(DateTime date)
