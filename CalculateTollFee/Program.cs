@@ -1,63 +1,62 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace TollFeeCalculator
 {
     public class Program
     {
-        static void Main()
+        private static void Main()
         {
-            run(Environment.CurrentDirectory + "../../../../testData.txt");
+            Run(Environment.CurrentDirectory + "../../../../testData.txt");
         }
 
-        public static void run(String inputFile)
+        public static void Run(string inputFile)
         {
-            string indata = File.ReadAllText(inputFile);
-            String[] dateStrings = indata.Split(", ");
-            DateTime[] dates = new DateTime[dateStrings.Length - 1];
-            for (int i = 0; i < dates.Length; i++)
-            {
-                dates[i] = DateTime.Parse(dateStrings[i]);
-            }
-            Console.Write("The total fee for the inputfile is " + TotalFeeCost(dates));
+            var p = new Program();
+            var indata = File.ReadAllText(inputFile);
+            var dates = indata
+                .Split(", ")
+                .Select(s => DateTime.Parse(s));
+
+            Console.Write("The total fee for the inputfile is " + p.TotalFeeCost(dates));
         }
 
-        public static int TotalFeeCost(DateTime[] dates)
+        public int TotalFeeCost(IEnumerable<DateTime> dates)
         {
-            DateTime startingInterval = dates[0];
-            int totalFee = 0;
-            int previousFee = 0;
-            foreach (var d2 in dates)
+            var firstDate = dates.First();
+            var startingTime = firstDate;
+            var fees = new Stack<int>();
+            fees.Push(CalculateTollFee(firstDate));
+
+            foreach (var date in dates)
             {
-                double diffInMinutes = (d2 - startingInterval).TotalMinutes;
-                if (diffInMinutes < 0) throw new FormatException("Dates is unsorted");
-                if (diffInMinutes < 60)
+                var diff = (date - startingTime).TotalMinutes;
+                if (date.Day != firstDate.Day) throw new FormatException("Dates span multiple days");
+                if (diff < 0) throw new FormatException("Dates are unsorted");
+                if (diff < 60)
                 {
-                    totalFee += Math.Max(TollFeePass(d2), TollFeePass(startingInterval));
+                    var fee1 = fees.Pop();
+                    var fee2 = CalculateTollFee(date);
+                    fees.Push(Math.Max(fee1, fee2));
                 }
                 else
                 {
-                    totalFee += TollFeePass(d2);
-                    startingInterval = d2;
+                    startingTime = date;
+                    fees.Push(CalculateTollFee(date));
                 }
             }
 
-            for (int i = 0; i < dates.Length; i++)
-            {
-                if(i == 0)
-                if((dates[i] - dates[i-1]).TotalMinutes < 60)
-                {
-                    totalFee += Math.Max(TollFeePass(dates[i]), TollFeePass(dates[i - 1]));
-                    totalFee -= Math.Min(TollFeePass(dates[i]), TollFeePass(dates[i - 1]));
-                }
-            }
+            var totalFee = fees.Sum();
+
             return Math.Min(totalFee, 60);
         }
 
-        static int TollFeePass(DateTime date)
+        private int CalculateTollFee(DateTime date)
         {
             if (IsDateFree(date)) return 0;
-            var fees = new[]
+            var timeFees = new[]
             {
                 ((0, 00), 0),
                 ((6, 00), 8),
@@ -72,22 +71,23 @@ namespace TollFeeCalculator
                 ((18, 30), 0)
             };
 
-            for (int i = 0; i < fees.Length; i++)
+            for (int i = 0; i < timeFees.Length; i++)
             {
-                (var hour, var minute) = fees[i].Item1;
+                (var hour, var minute) = timeFees[i].Item1;
+                var compare = new DateTime(date.Year, date.Month, date.Day, hour, minute, 00);
 
-                if (date.Hour < hour && date.Minute < minute) return fees[i - 1].Item2;
+                var difference = (compare - date).TotalMinutes;
+                if (difference > 0) return timeFees[i - 1].Item2;
             }
             return 0;
         }
 
-        static bool IsDateFree(DateTime day)
+        private bool IsDateFree(DateTime date)
         {
-            return (
-                day.DayOfWeek == DayOfWeek.Sunday || 
-                day.DayOfWeek == DayOfWeek.Saturday || 
-                day.Month == 7
-            );
+            return
+                date.DayOfWeek == DayOfWeek.Sunday ||
+                date.DayOfWeek == DayOfWeek.Saturday ||
+                date.Month == 7;
         }
     }
 }
